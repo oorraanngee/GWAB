@@ -1,0 +1,11 @@
+{
+  "title": "BredoPedea",
+  "description": "Закрытая инцеклопедия, на ней можно прочитать пару стетей. В будущем врядли будут новые ведь я забпросил сайт.",
+  "file": "index.html",
+  "style": "flat",
+  "flatColors": {
+    "primary": "#ffffff",
+    "secondary": "#000000"
+  },
+  "image": "2.png"
+}

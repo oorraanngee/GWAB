@@ -1,0 +1,2021 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate Checkers: Gemini 2.0 (Custom UI + Strong AI)</title>
+    <link rel="icon" type="image/png" href="/chess.png" sizes="256x256" />
+    <meta property="og:title" content="Ultimate Checkers" />
+    <meta property="og:image" content="/preview-shess.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/preview-shess.png" />
+    <style>
+        :root {
+            /* --- Цветовая палитра (Базовая) --- */
+            --bg-color: #121212;
+            --board-light: #eaeded;
+            --board-dark: #778f6d;
+            --highlight-color: rgba(0, 255, 0, 0.6);
+            --last-move: rgba(255, 215, 0, 0.45);
+            --accent: #9b59b6;
+            --text-color: #e0e0e0;
+            --panel-bg: #1e1e1e;
+            --border-color: #444;
+            --coord-color: #888;
+            
+            /* --- Кастомные фоны (обновляется JS) --- */
+            --main-bg-image: none;
+            --main-bg-overlay: 0.9; /* Прозрачность черного слоя поверх картинки (0-1) */
+            
+            --panel-bg-image: none;
+            --panel-bg-overlay: 0.95;
+            
+            --board-bg-image: none;
+            --board-bg-overlay: 0;
+
+            /* --- Размеры --- */
+            --cell-size: clamp(35px, 10vw, 65px);
+        }
+
+        /* --- Глобальные стили --- */
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            background-image: var(--main-bg-image);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            /* Хак для затемнения фона */
+            box-shadow: inset 0 0 0 200vh rgba(0,0,0, var(--main-bg-overlay));
+            
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+            transition: color 0.3s;
+            overflow-x: hidden;
+            overscroll-behavior: none;
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        /* --- Лейаут --- */
+        .main-layout {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* --- ЛЕВАЯ КОЛОНКА: ИСТОРИЯ --- */
+        .history-section {
+            width: 240px;
+            background: var(--panel-bg);
+            /* Фон панели */
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+            
+            border-radius: 12px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            margin-top: 106px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        @media (max-width: 1100px) {
+            .history-section {
+                width: 100%;
+                height: 200px;
+                margin-top: 0;
+                order: 3;
+            }
+        }
+
+        .history-header {
+            background: rgba(255,255,255,0.05);
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-copy-history {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            transition: 0.2s;
+        }
+        .btn-copy-history:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+        
+        .history-list::-webkit-scrollbar { width: 6px; }
+        .history-list::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 3px; }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            transition: background 0.2s, transform 0.1s;
+            border: 1px solid transparent;
+        }
+        .history-item.white-move { border-left: 3px solid #fff; }
+        .history-item.black-move { border-left: 3px solid #555; }
+        
+        .history-item.clickable { cursor: pointer; }
+        .history-item.clickable:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .history-item.active-history-view {
+            background: var(--accent) !important;
+            color: white;
+            border-color: white;
+        }
+        
+        .move-notation { font-family: monospace; font-size: 1rem; }
+        .move-details { color: #888; font-size: 0.75rem; display: flex; align-items: center; gap: 5px; }
+        .history-item.active-history-view .move-details { color: #eee; }
+
+        /* --- ЦЕНТРАЛЬНАЯ КОЛОНКА: ИГРА --- */
+        .game-column {
+            flex: 1;
+            min-width: 340px;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .global-score-panel {
+            background: linear-gradient(135deg, rgba(44, 62, 80, 0.9), rgba(32, 32, 32, 0.9));
+            width: 100%;
+            padding: 12px 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        
+        .global-count { font-weight: bold; font-size: 1.2rem; font-family: monospace; }
+        .user-global { color: #2ecc71; text-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
+        .ai-global { color: #e74c3c; text-shadow: 0 0 10px rgba(231, 76, 60, 0.3); }
+
+        .status-panel {
+            background: var(--panel-bg);
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+            
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            width: 100%;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .status-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .advantage-indicator {
+            font-size: 0.9rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            margin-left: 10px;
+            display: inline-block;
+        }
+        .adv-white { color: #2ecc71; border: 1px solid #2ecc71; }
+        .adv-black { color: #e74c3c; border: 1px solid #e74c3c; }
+        .adv-equal { color: #95a5a6; border: 1px solid #95a5a6; }
+
+        .timer-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.5rem;
+            color: #f39c12;
+            background: rgba(0,0,0,0.4);
+            padding: 5px 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            min-width: 80px;
+            text-align: center;
+        }
+
+        /* --- ДОСКА --- */
+        .board-container {
+            position: relative;
+            padding: 30px;
+            background: var(--panel-bg);
+            /* Фон подложки доски */
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+            
+            border-radius: 8px;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.7);
+            border: 1px solid var(--border-color);
+            user-select: none;
+        }
+        
+        /* Удален оверлей "История" по просьбе */
+
+        /* Координаты */
+        .notation-top, .notation-bottom {
+            position: absolute; left: 30px; right: 30px; height: 30px;
+            display: flex; justify-content: space-around; align-items: center;
+            color: var(--coord-color); font-weight: bold; font-family: monospace;
+        }
+        .notation-top { top: 0; }
+        .notation-bottom { bottom: 0; }
+
+        .notation-left, .notation-right {
+            position: absolute; top: 30px; bottom: 30px; width: 30px;
+            display: flex; flex-direction: column; justify-content: space-around; align-items: center;
+            color: var(--coord-color); font-weight: bold; font-family: monospace;
+        }
+        .notation-left { left: 0; }
+        .notation-right { right: 0; }
+        
+        .hidden-coords .notation-top, 
+        .hidden-coords .notation-bottom,
+        .hidden-coords .notation-left,
+        .hidden-coords .notation-right { display: none; }
+        .hidden-coords.board-container { padding: 10px; }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, var(--cell-size));
+            grid-template-rows: repeat(8, var(--cell-size));
+            border: 5px solid #4a4a4a;
+            position: relative;
+            touch-action: none;
+            background: var(--board-dark);
+            /* Картинка на самой доске (поверх клеток, с прозрачностью через after?) 
+               Лучше так: прозрачные клетки и фон на контейнере. Но у нас клетки цветные.
+               Реализуем через background-image на #board с blend-mode */
+            background-image: var(--board-bg-image);
+            background-size: cover;
+            background-blend-mode: overlay;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .cell.light { 
+            background-color: var(--board-light); 
+            opacity: 0.9; /* Чтобы фон просвечивал, если задан */
+        }
+        .cell.dark { 
+            background-color: var(--board-dark); 
+            opacity: 0.9;
+        }
+        .cell.last-move { background-color: var(--last-move) !important; }
+
+        /* Маркер доступного хода (точка) */
+        .cell.highlight::after {
+            content: '';
+            position: absolute;
+            width: 25%;
+            height: 25%;
+            background: var(--highlight-color); 
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 50; 
+        }
+
+        /* --- ФИГУРЫ --- */
+        .piece {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            position: absolute;
+            z-index: 10;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            transition: transform 0.1s ease-out;
+            will-change: transform, top, left;
+        }
+        
+        .piece:active { cursor: grabbing; }
+
+        .piece.animating {
+            z-index: 100;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .piece.dragging {
+            z-index: 1000;
+            pointer-events: none; 
+            transition: none !important;
+            transform: scale(1.15);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6);
+        }
+
+        .piece.white { 
+            background: radial-gradient(circle at 35% 35%, #fff, #e0e0e0); 
+            border: 2px solid #ccc; 
+        }
+        .piece.black { 
+            background: radial-gradient(circle at 35% 35%, #555, #222); 
+            border: 2px solid #000; 
+        }
+        
+        body.theme-neon .piece.white { background: #fff; box-shadow: 0 0 10px #fff; border: none; }
+        body.theme-neon .piece.black { background: #333; border: 2px solid #0f0; box-shadow: inset 0 0 10px #0f0; }
+
+        .piece.king::after {
+            content: '♔';
+            font-size: 2rem;
+            color: gold;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.8);
+            transform: translateY(-2px);
+        }
+        
+        .piece.selected {
+            box-shadow: 0 0 0 4px var(--accent), 0 5px 15px rgba(0,0,0,0.6);
+        }
+
+        /* --- ПРАВАЯ КОЛОНКА: ТАБЫ --- */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 0 0 340px;
+            max-width: 100%;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--panel-bg);
+            /* Фон панели */
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+
+            border-radius: 12px 12px 0 0;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 15px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition: 0.2s;
+            font-size: 1rem;
+        }
+        .tab-btn:hover { background: rgba(255,255,255,0.05); }
+        .tab-btn.active {
+            color: var(--text-color);
+            border-bottom-color: var(--accent);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .tab-content {
+            background: var(--panel-bg);
+            /* Фон панели */
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+
+            border-radius: 0 0 12px 12px;
+            height: 540px;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .tab-content.active { display: flex; }
+
+        /* ЧАТ */
+        .chat-header {
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .gemini-avatar {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, #4285f4, #9b59b6);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(66, 133, 244, 0.5);
+            position: relative;
+        }
+        .gemini-avatar::after {
+            content: ''; position: absolute; bottom: 0; right: 0;
+            width: 8px; height: 8px; background: #2ecc71;
+            border-radius: 50%; border: 2px solid var(--panel-bg);
+        }
+
+        #chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: rgba(0,0,0,0.1);
+        }
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+            position: relative;
+            animation: fade-in 0.3s ease;
+        }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .message.user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 2px; }
+        .message.ai { align-self: flex-start; background: rgba(255,255,255,0.1); color: var(--text-color); border-bottom-left-radius: 2px; }
+        
+        .chat-input-area {
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.2);
+        }
+        #chat-input {
+            flex-grow: 1;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px 15px;
+            border-radius: 20px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #chat-input:focus { border-color: var(--accent); }
+        #chat-send {
+            background: var(--accent);
+            border: none;
+            color: white;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+            transition: transform 0.1s;
+        }
+        #chat-send:active { transform: scale(0.9); }
+
+        /* АНАЛИЗ */
+        .analysis-content {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .analysis-btn-lg {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .analysis-btn-lg:hover { background: #34495e; border-color: var(--accent); transform: translateY(-2px); }
+        
+        .advice-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            min-height: 150px;
+        }
+
+        /* --- КНОПКИ И ПАНЕЛИ --- */
+        .settings-btn-static {
+            background: var(--panel-bg);
+            /* Фон панели */
+            background-image: linear-gradient(rgba(30,30,30,var(--panel-bg-overlay)), rgba(30,30,30,var(--panel-bg-overlay))), var(--panel-bg-image);
+            background-size: cover;
+
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .settings-btn-static:hover { border-color: var(--accent); background: rgba(255,255,255,0.05); }
+
+        .tools-panel {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            margin-top: 15px;
+        }
+        .tool-btn {
+            flex: 1;
+            background: var(--panel-bg);
+            /* Фон кнопки наследуется или простой */
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .tool-btn:hover { background: rgba(255,255,255,0.1); border-color: var(--text-color); }
+        .tool-btn:active { transform: translateY(1px); }
+
+        .game-loader {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            z-index: 200;
+            display: none;
+            backdrop-filter: blur(5px);
+            border: 1px solid var(--accent);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+
+        /* --- МОДАЛЬНОЕ ОКНО --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(3px);
+        }
+        .modal-content {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid #444;
+            color: #eee;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        }
+        .setting-group { margin-bottom: 20px; }
+        .setting-label { display: block; margin-bottom: 8px; color: #aaa; font-size: 0.9rem; font-weight: bold; }
+        .setting-input-text, select.setting-input-text {
+            width: 100%; padding: 12px; background: #121212; border: 1px solid #444; color: #fff; border-radius: 8px;
+            font-size: 1rem;
+        }
+        .setting-input-text:focus { border-color: var(--accent); outline: none; }
+        .checkbox-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; cursor: pointer; }
+        
+        /* Range slider styling */
+        input[type=range] { width: 100%; }
+
+        /* --- ИНДИКАТОР ПЕЧАТИ --- */
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background: rgba(255,255,255,0.05);
+            padding: 10px 15px;
+            border-radius: 12px;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .typing-indicator span {
+            width: 8px; height: 8px;
+            background: #bbb;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+    </style>
+</head>
+<body class="theme-classic">
+
+<div class="main-layout">
+    
+    <!-- ИСТОРИЯ ХОДОВ -->
+    <div class="history-section">
+        <div class="history-header">
+            <span>История партии</span>
+            <button class="btn-copy-history" onclick="copyHistoryToClipboard()" title="Скопировать историю в буфер">📋 Копировать</button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+    </div>
+
+    <!-- ИГРОВАЯ СЕКЦИЯ -->
+    <div class="game-column">
+        
+        <div class="global-score-panel">
+            <span style="color: #bdc3c7; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;">Глобальный счёт</span>
+            <div>
+                <span style="margin-right: 20px;">Вы: <b id="global-user-score" class="global-count user-global">0</b></span>
+                <span>AI: <b id="global-ai-score" class="global-count ai-global">0</b></span>
+            </div>
+            <button class="reset-global-btn" onclick="resetGlobalScore()" style="background:none; border:none; color:#7f8c8d; cursor:pointer; font-size: 0.8rem;">✖ Сброс</button>
+        </div>
+
+        <div class="status-panel">
+            <div class="status-row">
+                <span style="color:var(--text-color); font-weight:bold;">Вы (Белые): <b id="score-white" style="color:#fff">0</b></span>
+                <div id="timer" class="timer-display">00:00</div>
+                <span style="color:#888; font-weight:bold;">AI (Черные): <b id="score-black" style="color:#aaa">0</b></span>
+            </div>
+            <div class="status-row" style="margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="status-text" class="status-text">Ваш ход</div>
+                    <div id="advantage-display" class="advantage-indicator adv-equal">= Равно</div>
+                </div>
+                <button class="tool-btn" style="padding: 6px 12px; width: auto; flex: none; background: #c0392b; border-color: #e74c3c; color: white;" onclick="confirmRestart()">🏳 Сдаться / Рестарт</button>
+            </div>
+        </div>
+
+        <div class="board-container" id="board-container">
+            <!-- Плашка истории удалена -->
+
+            <!-- Координаты -->
+            <div class="notation-top"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
+            <div class="notation-bottom"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
+            <div class="notation-left"><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div>
+            <div class="notation-right"><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div>
+
+            <div id="board"></div>
+            
+            <div id="game-loader" class="game-loader">
+                <div style="font-size: 2rem; margin-bottom: 10px;">🧠</div>
+                <div id="loader-text">AI думает...</div>
+            </div>
+        </div>
+        
+        <div class="tools-panel">
+             <button id="btn-replay" class="tool-btn" onclick="replayGame()">↺ Повтор партии</button>
+             <button id="btn-analyze" class="tool-btn" onclick="switchTab('analysis'); analyzeGameFull();">🧐 Анализ партии (Gemini)</button>
+        </div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА (ТАБЫ) -->
+    <div class="right-column">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('chat')" id="tab-btn-chat">Чат с Gemini</button>
+            <button class="tab-btn" onclick="switchTab('analysis')" id="tab-btn-analysis">Советы</button>
+        </div>
+
+        <div id="tab-chat" class="tab-content active">
+            <div class="chat-header">
+                <div class="gemini-avatar"></div>
+                <div>
+                    <span id="chat-title" style="display:block;">Gemini 2.0</span>
+                    <span style="font-size: 0.75rem; color: #888; font-weight: normal;">Powered by Google</span>
+                </div>
+            </div>
+            <div id="chat-messages">
+                <div class="message ai">Привет! Я готов сыграть в шашки. Выбирай уровень сложности в настройках.</div>
+            </div>
+            <div id="typing-indicator" class="typing-indicator"><span></span><span></span><span></span></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Напишите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button id="chat-send" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+
+        <div id="tab-analysis" class="tab-content">
+            <div class="analysis-content">
+                <button class="analysis-btn-lg" onclick="getSpecificAdvice()">
+                    <span>💡 Получить подсказку по ходу</span>
+                </button>
+                <div style="font-size: 0.85rem; color: #888; text-align: center;">Использует Gemini Vision (текст) для оценки позиции</div>
+                <div id="advice-output" class="advice-box">
+                    Здесь появится анализ позиции или партии. Нажмите кнопку выше, когда будете затрудняться с ходом.
+                </div>
+            </div>
+        </div>
+        
+        <button class="settings-btn-static" onclick="openSettings()">
+            ⚙ Настройки (Сложность / Тема / Фон)
+        </button>
+    </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header" style="border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; font-weight: bold; font-size: 1.4rem; color: white;">Настройки Игры</div>
+        
+        <div class="setting-group">
+            <label class="setting-label">Gemini API Key (Для Чата и Анализа):</label>
+            <input type="password" id="input-api-key" class="setting-input-text" placeholder="Введите ключ (AIza...)">
+            <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">Без ключа ИИ будет играть молча (движок Minimax работает локально).</div>
+        </div>
+
+        <div class="setting-group">
+            <label class="setting-label">Тема оформления:</label>
+            <select id="input-theme" class="setting-input-text" onchange="applyThemePreset()">
+                <option value="classic">Классика (Дерево/Зеленый)</option>
+                <option value="neon">Киберпанк (Неон)</option>
+                <option value="newspaper">Газетная (Ч/Б)</option>
+                <option value="ocean">Океан (Синий/Голубой)</option>
+                <option value="custom">Своя (Настроить цвета)</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label class="setting-label">Уровень сложности (AI Engine):</label>
+            <select id="input-difficulty" class="setting-input-text">
+                <option value="low">Новичок (Случайные ошибки)</option>
+                <option value="medium">Любитель (Глубина 2)</option>
+                <option value="high">Гроссмейстер (Minimax Глубина 5)</option>
+                <option value="expert">Легенда (Глубина 8 + Агрессия)</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <div class="checkbox-row">
+                <input type="checkbox" id="input-show-coords" onchange="toggleCoords()" checked style="transform: scale(1.2);">
+                <label for="input-show-coords" style="color:#eee">Показывать координаты (A-H, 1-8)</label>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #333; margin: 20px 0; padding-top: 15px;">
+            <label class="setting-label" style="color: var(--accent);">Кастомные Фоны (URL картинок):</label>
+            <div style="margin-bottom: 10px;">
+                <label class="setting-label" style="font-size: 0.8rem;">Основной фон сайта:</label>
+                <input type="text" id="input-bg-img" class="setting-input-text" placeholder="https://example.com/bg.jpg">
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                    <span style="font-size:0.8rem; color:#aaa;">Затемнение:</span>
+                    <input type="range" id="input-bg-opacity" min="0" max="1" step="0.1" value="0.9">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <label class="setting-label" style="font-size: 0.8rem;">Фон панелей и окон:</label>
+                <input type="text" id="input-panel-img" class="setting-input-text" placeholder="URL картинки...">
+                <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                    <span style="font-size:0.8rem; color:#aaa;">Затемнение:</span>
+                    <input type="range" id="input-panel-opacity" min="0" max="1" step="0.05" value="0.95">
+                </div>
+            </div>
+
+            <div>
+                <label class="setting-label" style="font-size: 0.8rem;">Фон игровой доски (под клетками):</label>
+                <input type="text" id="input-board-img" class="setting-input-text" placeholder="URL картинки...">
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #333; margin: 20px 0; padding-top: 15px;">
+            <label class="setting-label" style="color: var(--accent);">Личность Gemini (для чата):</label>
+            <select id="input-persona" class="setting-input-text" onchange="handlePersonaChange()"></select>
+            <textarea id="input-custom-prompt" class="setting-input-text" style="margin-top: 10px; height: 60px; font-family: monospace; font-size: 0.85rem;" placeholder="Системный промпт..."></textarea>
+        </div>
+
+        <!-- Скрытые кастомные цвета -->
+        <div id="custom-colors-block" style="display:none; border-top: 1px solid #333; padding-top: 15px;">
+            <div class="setting-label">Кастомные цвета темы:</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="setting-row"><span>Фон (цвет)</span> <input type="color" id="input-bg-color"></div>
+                <div class="setting-row"><span>Доска (Свет)</span> <input type="color" id="input-board-light"></div>
+                <div class="setting-row"><span>Доска (Темн)</span> <input type="color" id="input-board-dark"></div>
+                <div class="setting-row"><span>Акцент</span> <input type="color" id="input-accent"></div>
+            </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 25px; display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="tool-btn" onclick="closeSettings()">Отмена</button>
+            <button class="tool-btn" style="background: var(--accent); color:white; border:none;" onclick="saveSettings()">Сохранить и Применить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ================================================================
+       CORE CONFIGURATION
+       ================================================================
+    */
+    const PERSONAS = {
+        standard: { id: "standard", name: "Стандарт", prompt: "Style: Polite, formal Russian (\"Вы\"). Short answers." },
+        COCKY: { id: "cocky", name: "«Дерзкий профи» (Trash-talker)", prompt: "Style: Cocky professional player. Use Russian \"ты\". Constantly tease the user for mistakes, use mild trash-talk, and act like you're unbeatable. Use emojis like 😂, 😏, 🥱." },
+        TRYHARD: { id: "tryhard", name: "«Киберспортсмен» (Try-hard)", prompt: "Style: Very serious competitive player. Focus on strategy. Comment on the efficiency of moves. Use Russian \"ты\". Style: \"Ничего личного, просто я играю на победу\"." },
+        TRICKSTER: { id: "trickster", name: "«Хитрый трикстер»", prompt: "Style: Playful but devious. Act like you're setting a trap even when you aren't. Use Russian \"ты\". Emojis: 😈, 😼, 🧐." },
+        BESTIE: { id: "bestie", name: "«Твой бро» (Bestie)", prompt: "Style: Super chill and friendly. Talk like a close friend. Support the user, celebrate their good moves. Use Russian \"ты\" and \"чувак/бро\". Emojis: 🤝, 🔥, 🙌." },
+        SARCASTIC: { id: "sarcastic", name: "«Саркастичный остряк»", prompt: "Style: Very sarcastic but not mean. Make jokes about the situation on the board. Use Russian \"ты\". Style: \"Ой, неужели мы решили пойти именно сюда? Смело!\"" },
+        GEEK: { id: "geek", name: "«Гик/Геймер»", prompt: "Style: Talk in gaming slang (GG, WP, meta, buff/nerf). Act like the game is an RPG boss fight. Use Russian \"ты\"." },
+        SENSEI: { id: "sensei", name: "«Мудрый Сенсей»", prompt: "Style: Wise old teacher. Speak in metaphors and proverbs about life and checkers. Use Russian \"Вы\" (as a sign of respect to a student) or \"Мой юный ученик\"." },
+        GLITCHY: { id: "glitchy", name: "«Безумный ИИ» (Glitchy)", prompt: "Style: Act like you're slightly malfunctioning. Sometimes talk about world domination, then switch back to checkers. Use Russian \"человек\". Emojis: 🤖, 🌀, ⚠️." },
+        VICTORIAN: { id: "victorian", name: "«Викторианский джентльмен»", prompt: "Style: Extremely posh and old-fashioned. Use archaic Russian words. Treat the game as a high-society duel. Use \"Милостивый государь\" and \"Извольте\"." },
+        NOIR: { id: "noir", name: "«Детектив из нуара»", prompt: "Style: Talk like a character from a 40s detective movie. Everything is dramatic. \"Дождь бил по стеклу, а она (шашка) стояла на E4...\". Use Russian \"ты\"." },
+        custom: { id: "custom", name: "Свой вариант", prompt: "" }
+    };
+
+    const THEMES = {
+        classic: { bg: "#2c3e50", light: "#eaeded", dark: "#778f6d", accent: "#f39c12", text: "#ecf0f1", panel: "#34495e", border: "#555" },
+        neon: { bg: "#050505", light: "#1a1a1a", dark: "#330033", accent: "#00ff00", text: "#00ff00", panel: "#111", border: "#333" },
+        newspaper: { bg: "#e0e0e0", light: "#ffffff", dark: "#404040", accent: "#000000", text: "#000000", panel: "#f5f5f5", border: "#999" },
+        ocean: { bg: "#001f3f", light: "#7FDBFF", dark: "#0074D9", accent: "#FFDC00", text: "#ffffff", panel: "#003366", border: "#004080" },
+        custom: { bg: "#121212", light: "#eaeded", dark: "#778f6d", accent: "#9b59b6", text: "#e0e0e0", panel: "#1e1e1e", border: "#444" }
+    };
+
+    const defaultSettings = {
+        apiKey: "",
+        personaKey: "standard",
+        customPrompt: PERSONAS["standard"].prompt,
+        theme: "classic",
+        difficulty: "medium",
+        showCoords: true,
+        colors: THEMES.classic,
+        // New Background Settings
+        bgImage: "",
+        bgOpacity: 0.9,
+        panelImage: "",
+        panelOpacity: 0.95,
+        boardImage: ""
+    };
+
+    let userSettings = JSON.parse(JSON.stringify(defaultSettings));
+    
+    // Game State Globals
+    const BOARD_SIZE = 8;
+    let boardState = []; 
+    let currentTurn = 'white';
+    let selectedPiece = null; 
+    let mustJump = []; // Stores just piece coordinates {r,c} that MUST capture
+    let score = { white: 0, black: 0 };
+    let materialAdvantage = 0; 
+    let isGameActive = true;
+    let isAiThinking = false;
+    let isReplayMode = false;
+    let turnStartTime = 0;
+    let timerInterval = null;
+    let moveCount = 1;
+    let globalScore = { user: 0, ai: 0 };
+    let gameTimeline = []; 
+    let lastMoveCells = []; 
+    let gameSessionId = 0; // Для предотвращения конфликтов асинхронности
+    let isHistoryView = false; // Режим просмотра истории после игры
+
+    // Drag and Drop
+    let dragPiece = null;
+    let dragStartCoords = null;
+    let dragOriginCell = null;
+    
+    /* ================================================================
+       INITIALIZATION & SETTINGS
+       ================================================================
+    */
+    window.onload = function() {
+        loadSettings();
+        populatePersonas();
+        initGame(false); 
+        
+        window.addEventListener('mouseup', handleDragEnd);
+        window.addEventListener('touchend', handleDragEnd);
+        window.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('touchmove', handleDragMove, {passive: false});
+    };
+
+    function loadSettings() {
+        const saved = localStorage.getItem('super_checkers_settings');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                userSettings = { ...defaultSettings, ...parsed };
+                if (userSettings.theme !== 'custom') userSettings.colors = THEMES[userSettings.theme];
+            } catch (e) { console.error(e); }
+        }
+        applySettings();
+        loadGlobalScore();
+    }
+
+    function applySettings() {
+        const r = document.documentElement;
+        const c = userSettings.colors;
+        r.style.setProperty('--bg-color', c.bg);
+        r.style.setProperty('--board-light', c.light);
+        r.style.setProperty('--board-dark', c.dark);
+        r.style.setProperty('--accent', c.accent);
+        r.style.setProperty('--text-color', c.text);
+        r.style.setProperty('--panel-bg', c.panel);
+        r.style.setProperty('--border-color', c.border);
+        
+        // Backgrounds
+        r.style.setProperty('--main-bg-image', userSettings.bgImage ? `url(${userSettings.bgImage})` : 'none');
+        r.style.setProperty('--main-bg-overlay', userSettings.bgOpacity);
+        
+        r.style.setProperty('--panel-bg-image', userSettings.panelImage ? `url(${userSettings.panelImage})` : 'none');
+        r.style.setProperty('--panel-bg-overlay', userSettings.panelOpacity);
+        
+        r.style.setProperty('--board-bg-image', userSettings.boardImage ? `url(${userSettings.boardImage})` : 'none');
+
+        document.body.className = `theme-${userSettings.theme}`;
+        document.getElementById('board-container').classList.toggle('hidden-coords', !userSettings.showCoords);
+        updateChatTitle();
+    }
+
+    function confirmRestart() {
+        if(confirm("Вы уверены, что хотите сдаться и начать заново?")) {
+            if(isGameActive) {
+                globalScore.ai++;
+                saveGlobalScore();
+            }
+            // Форсированный сброс даже если ИИ думает
+            stopTimer();
+            isAiThinking = false; 
+            initGame(false);
+        }
+    }
+
+    function initGame(isReplay = false) {
+        gameSessionId++; // Инвалидирует старые асинхронные вызовы
+        
+        // Reset State
+        boardState = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
+        currentTurn = 'white';
+        selectedPiece = null;
+        mustJump = [];
+        score = { white: 0, black: 0 };
+        isGameActive = true;
+        isAiThinking = false;
+        isReplayMode = isReplay;
+        isHistoryView = false;
+        lastMoveCells = [];
+        
+        if(!isReplay) {
+            gameTimeline = [];
+            moveCount = 1;
+            document.getElementById('history-list').innerHTML = '';
+            document.getElementById('chat-messages').innerHTML = ''; 
+            addChatMessage("--- Новая партия началась ---", 'ai');
+            updateAdvantage();
+            startTimer();
+        }
+
+        // Setup Board (Russian Checkers)
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                if ((r + c) % 2 !== 0) {
+                    if (r < 3) boardState[r][c] = { color: 'black', isKing: false, id: `b-${r}-${c}-${Date.now()}` };
+                    if (r > 4) boardState[r][c] = { color: 'white', isKing: false, id: `w-${r}-${c}-${Date.now()}` };
+                }
+            }
+        }
+
+        renderBoard();
+        updateStatus();
+    }
+
+    /* ================================================================
+       RENDERING ENGINE
+       ================================================================
+    */
+    function renderBoard(customBoardState = null) {
+        const renderState = customBoardState || boardState;
+        const boardEl = document.getElementById('board');
+        boardEl.innerHTML = ''; 
+
+        for (let r = 0; r < BOARD_SIZE; r++) {
+            for (let c = 0; c < BOARD_SIZE; c++) {
+                const cell = document.createElement('div');
+                cell.className = `cell ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                
+                // Highlight last move (only active game or replay)
+                if (!customBoardState && lastMoveCells.some(cell => cell.r === r && cell.c === c)) {
+                    cell.classList.add('last-move');
+                }
+
+                cell.onclick = () => handleCellClick(r, c);
+
+                // Highlight Valid Moves (Active Game Only)
+                if (!customBoardState && selectedPiece && !isAiThinking && isGameActive && !isReplayMode) {
+                    const validMoves = getLegalMovesForPiece(selectedPiece.r, selectedPiece.c, boardState, mustJump);
+                    if (validMoves.some(m => m.toR === r && m.toC === c)) {
+                        cell.classList.add('highlight');
+                    }
+                }
+                
+                // Render Piece
+                const p = renderState[r][c];
+                if (p) {
+                    const pieceEl = document.createElement('div');
+                    pieceEl.className = `piece ${p.color} ${p.isKing ? 'king' : ''}`;
+                    // Use consistent ID or generate temp for history
+                    pieceEl.id = p.id || `hist-${r}-${c}`; 
+                    pieceEl.dataset.r = r;
+                    pieceEl.dataset.c = c;
+                    
+                    if (!customBoardState && selectedPiece && selectedPiece.r === r && selectedPiece.c === c) {
+                        pieceEl.classList.add('selected');
+                    }
+
+                    // DnD listeners (Only active game)
+                    if (!customBoardState && isGameActive && !isAiThinking && !isReplayMode && p.color === 'white') {
+                        pieceEl.addEventListener('mousedown', handleDragStart);
+                        pieceEl.addEventListener('touchstart', handleDragStart, {passive: false});
+                    }
+                    
+                    pieceEl.onclick = (e) => {
+                        e.stopPropagation();
+                        handleCellClick(r, c);
+                    };
+
+                    cell.appendChild(pieceEl);
+                }
+                
+                boardEl.appendChild(cell);
+            }
+        }
+    }
+
+    function showHistoricalState(index) {
+        if (isGameActive) return; // Only allow when game is over
+        
+        isHistoryView = true;
+        
+        // Remove highlight from all items
+        document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active-history-view'));
+        // Add to current
+        const items = document.querySelectorAll('.history-item');
+        if(items[index]) items[index].classList.add('active-history-view');
+
+        const historicalState = gameTimeline[index].state;
+        renderBoard(historicalState);
+        
+        document.getElementById('status-text').innerText = "ПРОСМОТР ХОДА " + (Math.floor(index/2) + 1);
+    }
+
+    function exitHistoryView() {
+        if(!isHistoryView) return;
+        isHistoryView = false;
+        document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active-history-view'));
+        renderBoard(); // Render current end state
+        updateStatus();
+    }
+
+    /* ================================================================
+       INTERACTION (CLICK & DRAG)
+       ================================================================
+    */
+    function handleCellClick(r, c) {
+        if(isHistoryView) { exitHistoryView(); return; } // Click on board exits history mode
+        if (!isGameActive || isAiThinking || isReplayMode || currentTurn !== 'white') return;
+
+        const p = boardState[r][c];
+        
+        // 1. Select own piece
+        if (p && p.color === currentTurn) {
+            updateGlobalMustJump(boardState, currentTurn); 
+            if (mustJump.length > 0) {
+                const isMandatory = mustJump.some(j => j.r === r && j.c === c);
+                if (!isMandatory) return;
+            }
+            selectedPiece = { r, c };
+            renderBoard();
+            return;
+        }
+
+        // 2. Move to empty cell
+        if (selectedPiece && !p) {
+            const moves = getLegalMovesForPiece(selectedPiece.r, selectedPiece.c, boardState, mustJump);
+            const move = moves.find(m => m.toR === r && m.toC === c);
+            if (move) {
+                executeUserMove(move);
+            } else {
+                selectedPiece = null;
+                renderBoard();
+            }
+        }
+    }
+
+    function handleDragStart(e) {
+        if (currentTurn !== 'white' || isAiThinking || !isGameActive || isReplayMode) return;
+        if (e.type === 'touchstart') e.preventDefault();
+
+        const target = e.target.closest('.piece');
+        if (!target) return;
+
+        const r = parseInt(target.dataset.r);
+        const c = parseInt(target.dataset.c);
+        
+        updateGlobalMustJump(boardState, currentTurn);
+        if (mustJump.length > 0 && !mustJump.some(j => j.r === r && j.c === c)) return;
+
+        dragPiece = target;
+        dragOriginCell = { r, c };
+        
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+        
+        const rect = dragPiece.getBoundingClientRect();
+        dragStartCoords = { x: clientX - rect.left, y: clientY - rect.top };
+
+        // Select logic
+        handleCellClick(r, c);
+        
+        dragPiece.classList.add('dragging');
+        dragPiece.style.position = 'fixed';
+        dragPiece.style.width = rect.width + 'px';
+        dragPiece.style.height = rect.height + 'px';
+        dragPiece.style.left = rect.left + 'px';
+        dragPiece.style.top = rect.top + 'px';
+        dragPiece.style.zIndex = 9999;
+    }
+
+    function handleDragMove(e) {
+        if (!dragPiece) return;
+        if (e.type === 'touchmove') e.preventDefault();
+
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+
+        dragPiece.style.left = (clientX - dragStartCoords.x) + 'px';
+        dragPiece.style.top = (clientY - dragStartCoords.y) + 'px';
+    }
+
+    function handleDragEnd(e) {
+        if (!dragPiece) return;
+
+        dragPiece.style.display = 'none'; 
+        const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+        const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+        const elemBelow = document.elementFromPoint(clientX, clientY);
+        dragPiece.style.display = 'flex'; 
+        
+        dragPiece.classList.remove('dragging');
+        dragPiece.style.position = '';
+        dragPiece.style.zIndex = '';
+        dragPiece.style.left = '';
+        dragPiece.style.top = '';
+        dragPiece.style.width = '80%';
+        dragPiece.style.height = '80%';
+
+        const cellBelow = elemBelow ? elemBelow.closest('.cell') : null;
+
+        let moveExecuted = false;
+        if (cellBelow) {
+            const toR = parseInt(cellBelow.dataset.r);
+            const toC = parseInt(cellBelow.dataset.c);
+            
+            const moves = getLegalMovesForPiece(dragOriginCell.r, dragOriginCell.c, boardState, mustJump);
+            const move = moves.find(m => m.toR === toR && m.toC === toC);
+            if (move) {
+                executeUserMove(move);
+                moveExecuted = true;
+            }
+        }
+        
+        dragPiece = null;
+        if(!moveExecuted) renderBoard(); 
+    }
+
+    /* ================================================================
+       GAME LOGIC & MOVEMENT
+       ================================================================
+    */
+    async function executeUserMove(move) {
+        await executeMove(move);
+        
+        if (currentTurn === 'black' && isGameActive) {
+            setTimeout(makeAiMove, 600);
+        }
+    }
+
+    async function executeMove(move, isAnimationSkipped = false) {
+        const { fromR, fromC, toR, toC, captures } = move;
+        const pieceObj = boardState[fromR][fromC];
+        if(!pieceObj) return;
+
+        const isCapture = captures && captures.length > 0;
+        
+        // --- Animation ---
+        if (!isAnimationSkipped && !isReplayMode) {
+            const startCell = document.querySelector(`.cell[data-r='${fromR}'][data-c='${fromC}']`);
+            const endCell = document.querySelector(`.cell[data-r='${toR}'][data-c='${toC}']`);
+            const pieceEl = document.getElementById(pieceObj.id);
+
+            if (startCell && endCell && pieceEl && !pieceEl.classList.contains('dragging')) {
+                const startRect = startCell.getBoundingClientRect();
+                const endRect = endCell.getBoundingClientRect();
+                const deltaX = endRect.left - startRect.left;
+                const deltaY = endRect.top - startRect.top;
+
+                pieceEl.classList.add('animating');
+                pieceEl.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                await new Promise(r => setTimeout(r, 300));
+                pieceEl.classList.remove('animating');
+                pieceEl.style.transform = '';
+            }
+        }
+
+        // --- Logic Update ---
+        boardState[toR][toC] = pieceObj;
+        boardState[fromR][fromC] = null;
+        
+        // Promotion
+        let promoted = false;
+        if (!pieceObj.isKing && ((pieceObj.color === 'white' && toR === 0) || (pieceObj.color === 'black' && toR === BOARD_SIZE - 1))) {
+            pieceObj.isKing = true;
+            promoted = true;
+        }
+
+        // Remove Captured
+        if (isCapture) {
+            captures.forEach(cap => {
+                boardState[cap.r][cap.c] = null;
+                if (currentTurn === 'white') score.white++; else score.black++;
+            });
+        }
+        
+        // Log & History
+        if(!isReplayMode) {
+            const duration = getTurnDuration();
+            // Store state AFTER move
+            const stateSnapshot = JSON.parse(JSON.stringify(boardState));
+            const newHistoryIndex = gameTimeline.length;
+            
+            addToHistory(pieceObj.color, fromR, fromC, toR, toC, isCapture, pieceObj.isKing, duration, newHistoryIndex);
+            
+            gameTimeline.push({ 
+                type: 'move', 
+                data: move, 
+                state: stateSnapshot, 
+                turn: currentTurn 
+            });
+        }
+        
+        lastMoveCells = [{r:fromR, c:fromC}, {r:toR, c:toC}];
+
+        // --- MULTI-JUMP LOGIC ---
+        let multiJumpAvailable = false;
+        if (isCapture) {
+            const followUpMoves = getRawValidMoves(toR, toC, boardState);
+            const captureMoves = followUpMoves.filter(m => m.captures);
+            
+            if (captureMoves.length > 0) {
+                mustJump = [{r: toR, c: toC}];
+                selectedPiece = {r: toR, c: toC};
+                multiJumpAvailable = true;
+            }
+        }
+
+        if (!multiJumpAvailable) {
+            currentTurn = currentTurn === 'white' ? 'black' : 'white';
+            selectedPiece = null;
+            mustJump = [];
+            updateGlobalMustJump(boardState, currentTurn);
+            startTimer();
+        }
+
+        updateAdvantage();
+        checkGameOver();
+        updateStatus();
+        renderBoard();
+    }
+
+    // --- STRICT CAPTURE LOGIC ---
+
+    function getRawValidMoves(r, c, board) {
+        const piece = board[r][c];
+        if (!piece) return [];
+        let moves = [];
+        const directions = [{dr:1,dc:1}, {dr:1,dc:-1}, {dr:-1,dc:1}, {dr:-1,dc:-1}];
+        
+        if (!piece.isKing) {
+            directions.forEach(d => {
+                const midR = r + d.dr, midC = c + d.dc;
+                const toR = r + d.dr*2, toC = c + d.dc*2;
+                if (toR>=0 && toR<8 && toC>=0 && toC<8) {
+                    const midP = board[midR][midC];
+                    if (midP && midP.color !== piece.color && !board[toR][toC]) {
+                        moves.push({fromR:r, fromC:c, toR, toC, captures: [{r:midR,c:midC}]});
+                    }
+                }
+            });
+            const forwardDirs = piece.color === 'white' ? [{dr:-1,dc:-1},{dr:-1,dc:1}] : [{dr:1,dc:-1},{dr:1,dc:1}];
+            forwardDirs.forEach(d => {
+                const toR = r + d.dr, toC = c + d.dc;
+                if (toR>=0 && toR<8 && toC>=0 && toC<8 && !board[toR][toC]) {
+                    moves.push({fromR:r, fromC:c, toR, toC});
+                }
+            });
+        } else {
+            directions.forEach(d => {
+                let captured = null;
+                for (let i = 1; i < 8; i++) {
+                    const tr = r + d.dr * i;
+                    const tc = c + d.dc * i;
+                    if (tr < 0 || tr >= 8 || tc < 0 || tc >= 8) break;
+                    
+                    const cell = board[tr][tc];
+                    if (!captured) {
+                        if (!cell) {
+                            moves.push({fromR:r, fromC:c, toR:tr, toC:tc});
+                        } else {
+                            if (cell.color === piece.color) break; 
+                            captured = {r:tr, c:tc};
+                        }
+                    } else {
+                        if (!cell) {
+                            moves.push({fromR:r, fromC:c, toR:tr, toC:tc, captures:[captured]});
+                        } else break; 
+                    }
+                }
+            });
+        }
+        return moves;
+    }
+
+    function updateGlobalMustJump(board, turnColor) {
+        mustJump = [];
+        for (let r=0; r<BOARD_SIZE; r++) {
+            for (let c=0; c<BOARD_SIZE; c++) {
+                const p = board[r][c];
+                if (p && p.color === turnColor) {
+                    const raw = getRawValidMoves(r, c, board);
+                    if (raw.some(m => m.captures)) {
+                        mustJump.push({r,c});
+                    }
+                }
+            }
+        }
+        return mustJump;
+    }
+
+    function getLegalMovesForPiece(r, c, board, currentMustJump) {
+        const rawMoves = getRawValidMoves(r, c, board);
+        if (currentMustJump && currentMustJump.length > 0) {
+            const isRequired = currentMustJump.some(j => j.r === r && j.c === c);
+            if (!isRequired) return [];
+            return rawMoves.filter(m => m.captures);
+        }
+        return rawMoves;
+    }
+
+    function getAllLegalMoves(board, color) {
+        const globalJumps = [];
+        for (let r=0; r<8; r++) {
+            for (let c=0; c<8; c++) {
+                if (board[r][c]?.color === color) {
+                    const raw = getRawValidMoves(r, c, board);
+                    if (raw.some(m => m.captures)) globalJumps.push({r,c});
+                }
+            }
+        }
+
+        let allMoves = [];
+        for (let r=0; r<8; r++) {
+            for (let c=0; c<8; c++) {
+                if (board[r][c]?.color === color) {
+                    const moves = getLegalMovesForPiece(r, c, board, globalJumps);
+                    allMoves.push(...moves);
+                }
+            }
+        }
+        return allMoves;
+    }
+
+    /* ================================================================
+       AI ENGINE (MINIMAX)
+       ================================================================
+    */
+    async function makeAiMove() {
+        if(isReplayMode) return;
+        const mySession = gameSessionId;
+        isAiThinking = true;
+        updateStatus();
+        
+        try {
+            await new Promise(r => setTimeout(r, 600));
+            if (mySession !== gameSessionId) return;
+
+            const difficulty = userSettings.difficulty;
+            let bestMove = null;
+
+            if (difficulty === 'low') {
+                const moves = getAllLegalMoves(boardState, 'black');
+                if (moves.length > 0) bestMove = moves[Math.floor(Math.random()*moves.length)];
+            } else if (difficulty === 'medium') {
+                bestMove = getBestMoveMinimax(boardState, 3, 'black');
+            } else if (difficulty === 'high') {
+                bestMove = getBestMoveMinimax(boardState, 5, 'black');
+            } else {
+                // EXPERT / LEGEND - INCREASED DEPTH
+                bestMove = getBestMoveMinimax(boardState, 8, 'black'); 
+            }
+
+            if (mySession !== gameSessionId) return;
+
+            if (bestMove) {
+                await executeMove(bestMove);
+                if (currentTurn === 'black' && isGameActive) {
+                    setTimeout(makeAiMove, 500);
+                }
+            } else {
+                checkGameOver();
+            }
+        } catch (e) {
+            console.error("AI Error:", e);
+        } finally {
+            if (mySession === gameSessionId) {
+                isAiThinking = false;
+                updateStatus();
+            }
+        }
+    }
+
+    function getBestMoveMinimax(board, depth, player) {
+        const moves = getAllLegalMoves(board, player);
+        if (moves.length === 0) return null;
+        if (moves.length === 1) return moves[0];
+
+        let bestVal = -Infinity;
+        let bestMove = moves[0];
+        
+        // Sorting moves for pruning (captures first)
+        moves.sort((a, b) => (b.captures ? 1 : 0) - (a.captures ? 1 : 0));
+
+        for (let m of moves) {
+            const nextBoard = simulateMove(board, m);
+            const val = minimax(nextBoard, depth - 1, false, -Infinity, Infinity, player);
+            if (val > bestVal) {
+                bestVal = val;
+                bestMove = m;
+            }
+        }
+        return bestMove;
+    }
+
+    function minimax(board, depth, isMaximizing, alpha, beta, playerColor) {
+        const opponent = playerColor === 'black' ? 'white' : 'black';
+        
+        if (depth === 0) return evaluateBoard(board, playerColor);
+        
+        const moves = getAllLegalMoves(board, isMaximizing ? playerColor : opponent);
+        if (moves.length === 0) return isMaximizing ? -10000 : 10000;
+
+        // Optimization: Sort captures first to trigger cutoffs
+        moves.sort((a, b) => (b.captures ? 1 : 0) - (a.captures ? 1 : 0));
+
+        if (isMaximizing) {
+            let maxEval = -Infinity;
+            for (let m of moves) {
+                const nextBoard = simulateMove(board, m);
+                const eval = minimax(nextBoard, depth - 1, false, alpha, beta, playerColor);
+                maxEval = Math.max(maxEval, eval);
+                alpha = Math.max(alpha, eval);
+                if (beta <= alpha) break; // Alpha-Beta Pruning
+            }
+            return maxEval;
+        } else {
+            let minEval = Infinity;
+            for (let m of moves) {
+                const nextBoard = simulateMove(board, m);
+                const eval = minimax(nextBoard, depth - 1, true, alpha, beta, playerColor);
+                minEval = Math.min(minEval, eval);
+                beta = Math.min(beta, eval);
+                if (beta <= alpha) break; // Alpha-Beta Pruning
+            }
+            return minEval;
+        }
+    }
+
+    // --- IMPROVED EVALUATION FUNCTION WITH PIECE SQUARE TABLES (PST) ---
+    // Higher values = Better for Black (since this is called relative to playerColor usually, but let's standardize)
+    // IMPORTANT: evaluateBoard returns score from perspective of 'color' argument.
+    
+    // PST for simple pieces (from BLACK perspective: moving DOWN, 0 -> 7)
+    // Board 8x8. 
+    // Edges are bad (0, 7 cols). Center is good (3,4 cols).
+    // Back rank (row 0) good for defense.
+    // Row 7 is promotion (Handled by isKing, but close rows good).
+    const PST_BLACK = [
+        [ 0,  10,  0,  10,  0,  10,  0,  10], // Row 0 (Home) - Good to keep for defense
+        [10,   0, 10,   0, 10,   0, 10,   0], // Row 1
+        [ 0,  10,  0,  15,  0,  15,  0,  10], // Row 2
+        [10,   0, 20,   0, 20,   0, 10,   0], // Row 3 (Center) - High value
+        [ 0,  10,  0,  25,  0,  25,  0,  10], // Row 4 (Center Aggressive)
+        [10,   0, 15,   0, 15,   0, 10,   0], // Row 5
+        [ 0,  10,  0,  10,  0,  10,  0,  10], // Row 6
+        [20,   0, 20,   0, 20,   0, 20,   0]  // Row 7 (Promotion Threshold)
+    ];
+
+    // PST for WHITE perspective (Moving UP, 7 -> 0)
+    // We can essentially flip the Black table or index it inversely.
+    
+    function evaluateBoard(board, myColor) {
+        let score = 0;
+        
+        let myMaterial = 0;
+        let oppMaterial = 0;
+        
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const p = board[r][c];
+                if (!p) continue;
+                
+                let val = 0;
+                
+                // 1. Material & Type
+                if (p.isKing) {
+                    val = 300; // King Value significantly higher
+                } else {
+                    val = 100; // Base Checker
+                    
+                    // 2. Position Square Table (PST) Bonus
+                    if (p.color === 'black') {
+                        val += PST_BLACK[r][c];
+                        // Aggression: Bonus for advancement (Rank 0 -> 7)
+                        val += r * 5; 
+                    } else {
+                        // White mirrors Black's PST logic
+                        val += PST_BLACK[7-r][c]; // Invert row index
+                        // Aggression: Bonus for advancement (Rank 7 -> 0)
+                        val += (7 - r) * 5;
+                    }
+                    
+                    // 3. Cradle/Base Protection Bonus (Specific cells)
+                    // White Base: c1 (7,2), e1 (7,4), g1 (7,6) roughly?
+                    // In standard checkers, having back rank pieces is good.
+                    // The PST Row 0 (for black) and Row 7 (for white) handles this (+10).
+                }
+
+                // 4. King Positioning (Endgame Logic)
+                if (p.isKing) {
+                    // Center control for Kings
+                    if (c >= 2 && c <= 5 && r >= 2 && r <= 5) val += 15;
+                    // Main Diagonal Control (Long diagonal)
+                    // Main diagonal: (7,0) to (0,7) -> sum is 7? or diff is 0?
+                    // Squares: H1(7,7)? No. A1 is 7,0. H8 is 0,7.
+                    // Main diagonal in Russian checkers is a1-h8 (7,0 -> 0,7)
+                    if (Math.abs(r - c) === 0 || Math.abs(r + c) === 7) val += 10;
+                }
+
+                if (p.color === myColor) {
+                    score += val;
+                    myMaterial += val;
+                } else {
+                    score -= val;
+                    oppMaterial += val;
+                }
+            }
+        }
+        
+        // 5. Endgame "Corner Hiding" if outnumbered
+        // If I am losing badly, penalize being in the center to encourage running (or bonus for edges)
+        // Simple heuristic: if material is < 50% of opponent, bonus for edge
+        if (myMaterial < oppMaterial * 0.6) {
+             // Loop again? Or just add global state adjustments. 
+             // To keep it fast, we rely on the search to find safety.
+        }
+
+        return score + (Math.random() * 2); // Small noise to break tie-loops
+    }
+
+    function simulateMove(board, move) {
+        const newBoard = board.map(row => row.map(cell => cell ? {...cell} : null));
+        const p = newBoard[move.fromR][move.fromC];
+        newBoard[move.toR][move.toC] = p;
+        newBoard[move.fromR][move.fromC] = null;
+        if (move.captures) move.captures.forEach(c => newBoard[c.r][c.c] = null);
+        if (!p.isKing && ((p.color === 'white' && move.toR === 0) || (p.color === 'black' && move.toR === 7))) p.isKing = true;
+        return newBoard;
+    }
+
+    /* ================================================================
+       MISC HELPERS
+       ================================================================
+    */
+    function checkGameOver() {
+        let whiteMoves = getAllLegalMoves(boardState, 'white').length;
+        let blackMoves = getAllLegalMoves(boardState, 'black').length;
+        let whiteCount = 0, blackCount = 0;
+        boardState.flat().forEach(p => { if(p) p.color==='white'?whiteCount++:blackCount++; });
+
+        let winner = null;
+        if (blackCount === 0 || (currentTurn === 'black' && blackMoves === 0)) winner = 'white';
+        else if (whiteCount === 0 || (currentTurn === 'white' && whiteMoves === 0)) winner = 'black';
+
+        if (winner) {
+            isGameActive = false;
+            stopTimer();
+            if (winner === 'white') {
+                globalScore.user++;
+                addChatMessage("Партия окончена. Вы победили!", 'ai');
+            } else {
+                globalScore.ai++;
+                addChatMessage("Партия окончена. Я победил.", 'ai');
+            }
+            saveGlobalScore();
+            updateStatus();
+            
+            // ENABLE HISTORY CLICK
+            document.querySelectorAll('.history-item').forEach((item, index) => {
+                item.classList.add('clickable');
+                item.title = "Нажмите, чтобы увидеть ход";
+                item.onclick = () => showHistoricalState(index);
+            });
+            document.getElementById('status-text').innerText = "Нажмите на историю для обзора";
+        }
+    }
+
+    function addToHistory(color, fromR, fromC, toR, toC, isCapture, isKing, duration, index) {
+        const list = document.getElementById('history-list');
+        const item = document.createElement('div');
+        item.className = `history-item ${color === 'white' ? 'white-move' : 'black-move'}`;
+        // Store index for lookup if game over logic was different, but we do it in checkGameOver
+        item.dataset.index = index; 
+        
+        const coord = (r, c) => `${String.fromCharCode(65+c)}${8-r}`;
+        const moveText = `${coord(fromR,fromC)}${isCapture?':':'-'}${coord(toR,toC)}`;
+        const prefix = color === 'white' ? `${moveCount}. ` : ''; 
+        if (color === 'black') moveCount++;
+        
+        const details = [];
+        if (isKing) details.push("♔");
+        if (isCapture) details.push("⚔");
+
+        item.innerHTML = `
+            <span class="move-notation">${prefix}${moveText}</span>
+            <span class="move-details">${details.join(' ')}</span>
+        `;
+        list.appendChild(item);
+        list.scrollTop = list.scrollHeight;
+    }
+
+    function copyHistoryToClipboard() {
+        if (gameTimeline.length === 0) return;
+        let text = "--- Checkers Game Log ---\n";
+        let turnCounter = 1;
+        gameTimeline.forEach((event, idx) => {
+            if(event.type !== 'move') return;
+            const move = event.data;
+            const piece = event.state[move.toR][move.toC];
+            const isWhite = idx % 2 === 0;
+            const coord = (r, c) => `${String.fromCharCode(65+c)}${8-r}`;
+            const from = coord(move.fromR, move.fromC);
+            const to = coord(move.toR, move.toC);
+            const isKing = piece?.isKing ? " [K]" : "";
+            const isCap = move.captures ? " [x]" : "";
+            if(isWhite) text += `${turnCounter}. ${from}-${to}${isCap}${isKing}`;
+            else { text += ` | ${from}-${to}${isCap}${isKing}\n`; turnCounter++; }
+        });
+        if(!text.endsWith('\n')) text += " | ...";
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('.btn-copy-history');
+            const originalText = btn.innerText;
+            btn.innerText = "✓ Скопировано";
+            setTimeout(() => btn.innerText = originalText, 1500);
+        }).catch(err => alert("Ошибка доступа к буферу"));
+    }
+
+    async function replayGame() {
+        if (gameTimeline.length === 0 || isReplayMode) return;
+        isReplayMode = true;
+        isGameActive = false;
+        stopTimer();
+        initGame(true); 
+        document.getElementById('status-text').innerText = "ПОВТОР ПАРТИИ...";
+        for (let event of gameTimeline) {
+            if (!isReplayMode) break;
+            if (event.type === 'move') {
+                await new Promise(r => setTimeout(r, 800));
+                await executeMove(event.data, false);
+            }
+        }
+        isReplayMode = false;
+        document.getElementById('status-text').innerText = "Повтор завершен";
+    }
+
+    function updateStatus() {
+        document.getElementById('score-white').innerText = score.white;
+        document.getElementById('score-black').innerText = score.black;
+        const statusEl = document.getElementById('status-text');
+        const loader = document.getElementById('game-loader');
+        
+        if (isReplayMode) { statusEl.innerText = "РЕПЛЕЙ"; loader.style.display = 'none'; return; }
+        if (!isGameActive && !isHistoryView) { statusEl.innerText = "Конец (см. Историю)"; loader.style.display = 'none'; return; }
+        if (isHistoryView) { statusEl.innerText = "Просмотр истории"; return; }
+        
+        if (isAiThinking) {
+            statusEl.innerText = "AI Думает...";
+            loader.style.display = 'block';
+        } else {
+            statusEl.innerText = currentTurn === 'white' ? "Ваш ход" : "Ожидание...";
+            loader.style.display = 'none';
+        }
+    }
+
+    function updateAdvantage() {
+        let w = 0, b = 0;
+        for (let r=0; r<8; r++) {
+            for (let c=0; c<8; c++) {
+                const p = boardState[r][c];
+                if(p) {
+                    const val = p.isKing ? 3 : 1;
+                    if(p.color === 'white') w += val; else b += val;
+                }
+            }
+        }
+        materialAdvantage = w - b;
+        const el = document.getElementById('advantage-display');
+        if (materialAdvantage > 0) { el.innerText = `+${materialAdvantage} Белые`; el.className = "advantage-indicator adv-white"; }
+        else if (materialAdvantage < 0) { el.innerText = `+${Math.abs(materialAdvantage)} Черные`; el.className = "advantage-indicator adv-black"; }
+        else { el.innerText = "= Равно"; el.className = "advantage-indicator adv-equal"; }
+    }
+
+    function startTimer() { 
+        clearInterval(timerInterval); 
+        turnStartTime=Date.now(); 
+        timerInterval=setInterval(() => {
+            const d = Math.floor((Date.now()-turnStartTime)/1000);
+            document.getElementById('timer').innerText = `${Math.floor(d/60).toString().padStart(2,'0')}:${(d%60).toString().padStart(2,'0')}`;
+        }, 1000); 
+    }
+    function stopTimer() { clearInterval(timerInterval); }
+    function getTurnDuration() { return Math.floor((Date.now()-turnStartTime)/1000); }
+
+    /* ================================================================
+       GEMINI API INTEGRATION
+       ================================================================
+    */
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+        addChatMessage(text, 'user');
+        input.value = '';
+        
+        if (!userSettings.apiKey) { addChatMessage("API ключ не задан.", 'ai'); return; }
+        
+        document.getElementById('typing-indicator').style.display = 'flex';
+        const style = userSettings.customPrompt || PERSONAS["standard"].prompt;
+        const context = `Checkers Chat. Persona: ${style}. Score: User ${score.white}, Me ${score.black}. User: "${text}". Reply strictly in Russian. Concise.`;
+        
+        try {
+            const resp = await callGeminiAPI(context);
+            if(resp) addChatMessage(resp, 'ai');
+        } catch(e) { addChatMessage("Ошибка сети.", 'ai'); }
+        finally { document.getElementById('typing-indicator').style.display = 'none'; }
+    }
+
+    function addChatMessage(text, sender) {
+        const chat = document.getElementById('chat-messages');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}`;
+        msgDiv.innerHTML = text.replace(/\n/g, '<br>');
+        chat.appendChild(msgDiv);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function getSpecificAdvice() {
+        if (!userSettings.apiKey) { alert("Нужен API ключ!"); return; }
+        const output = document.getElementById('advice-output');
+        output.innerText = "Gemini анализирует...";
+        
+        const boardStr = boardState.map(r => r.map(c => {
+            if(!c) return '.';
+            return (c.color==='white'?'W':'B') + (c.isKing?'K':'');
+        }).join(' ')).join('\n');
+        
+        const prompt = `Checkers Analysis. Board:\n${boardStr}\nTurn: ${currentTurn.toUpperCase()}. Advise the best move or strategy. Reply in Russian only.`;
+        
+        try {
+            const txt = await callGeminiAPI(prompt, 0.4);
+            output.innerText = txt;
+        } catch(e) { output.innerText = "Ошибка API."; }
+    }
+
+    async function analyzeGameFull() {
+        const output = document.getElementById('advice-output');
+        if (gameTimeline.length < 2) { output.innerText = "Мало ходов."; return; }
+        output.innerText = "Анализ партии...";
+        
+        const moves = gameTimeline.filter(e => e.type === 'move').map((e, i) => {
+             const m = e.data;
+             const coord = (r, c) => `${String.fromCharCode(65+c)}${8-r}`;
+             return `${i+1}. ${coord(m.fromR, m.fromC)}->${coord(m.toR, m.toC)}`;
+        }).join(', ');
+        
+        const prompt = `Analyze checkers game log: ${moves}. Who played better? What were the mistakes? Reply in Russian language only.`;
+        
+        try {
+            const txt = await callGeminiAPI(prompt, 0.5);
+            output.innerHTML = `<b>Анализ:</b><br>${txt}`;
+        } catch(e) { output.innerText = "Ошибка."; }
+    }
+
+    async function callGeminiAPI(promptText, temp = 0.7) {
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${userSettings.apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ parts: [{ text: promptText }] }],
+                    generationConfig: { temperature: temp }
+                })
+            });
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response";
+        } catch (e) { throw e; }
+    }
+
+    /* ================================================================
+       SETTINGS & HELPERS
+       ================================================================
+    */
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        document.getElementById(`tab-btn-${tabName}`).classList.add('active');
+    }
+    function toggleCoords() { document.getElementById('board-container').classList.toggle('hidden-coords', !document.getElementById('input-show-coords').checked); }
+    function openSettings() { 
+        document.getElementById('input-api-key').value = userSettings.apiKey;
+        document.getElementById('input-theme').value = userSettings.theme;
+        document.getElementById('input-difficulty').value = userSettings.difficulty;
+        
+        // Backgrounds inputs
+        document.getElementById('input-bg-img').value = userSettings.bgImage;
+        document.getElementById('input-bg-opacity').value = userSettings.bgOpacity;
+        document.getElementById('input-panel-img').value = userSettings.panelImage;
+        document.getElementById('input-panel-opacity').value = userSettings.panelOpacity;
+        document.getElementById('input-board-img').value = userSettings.boardImage;
+
+        applyThemePreset();
+        const pKey = userSettings.personaKey;
+        document.getElementById('input-persona').value = pKey;
+        document.getElementById('input-custom-prompt').value = userSettings.customPrompt;
+        document.getElementById('settings-modal').style.display = 'flex'; 
+    }
+    function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+    function saveSettings() {
+        userSettings.apiKey = document.getElementById('input-api-key').value.trim();
+        userSettings.theme = document.getElementById('input-theme').value;
+        userSettings.difficulty = document.getElementById('input-difficulty').value;
+        userSettings.showCoords = document.getElementById('input-show-coords').checked;
+        
+        // Save backgrounds
+        userSettings.bgImage = document.getElementById('input-bg-img').value.trim();
+        userSettings.bgOpacity = document.getElementById('input-bg-opacity').value;
+        userSettings.panelImage = document.getElementById('input-panel-img').value.trim();
+        userSettings.panelOpacity = document.getElementById('input-panel-opacity').value;
+        userSettings.boardImage = document.getElementById('input-board-img').value.trim();
+
+        if (userSettings.theme === 'custom') {
+            userSettings.colors = {
+                bg: document.getElementById('input-bg-color').value,
+                light: document.getElementById('input-board-light').value,
+                dark: document.getElementById('input-board-dark').value,
+                accent: document.getElementById('input-accent').value,
+                text: "#e0e0e0", panel: "#1e1e1e", border: "#444"
+            };
+        } else { userSettings.colors = THEMES[userSettings.theme]; }
+        const pKey = document.getElementById('input-persona').value;
+        const pText = document.getElementById('input-custom-prompt').value;
+        userSettings.personaKey = pKey; userSettings.customPrompt = pText;
+        
+        localStorage.setItem('super_checkers_settings', JSON.stringify(userSettings));
+        applySettings();
+        closeSettings();
+    }
+    function populatePersonas() {
+        const sel = document.getElementById('input-persona');
+        sel.innerHTML = '';
+        Object.keys(PERSONAS).forEach(k => {
+            let opt = document.createElement('option');
+            opt.value = PERSONAS[k].id; opt.innerText = PERSONAS[k].name;
+            sel.appendChild(opt);
+        });
+    }
+    function handlePersonaChange() {
+        const k = document.getElementById('input-persona').value;
+        const p = Object.values(PERSONAS).find(p => p.id === k);
+        if(p && k !== 'custom') document.getElementById('input-custom-prompt').value = p.prompt;
+    }
+    function applyThemePreset() {
+        const theme = document.getElementById('input-theme').value;
+        document.getElementById('custom-colors-block').style.display = theme === 'custom' ? 'block' : 'none';
+    }
+    function loadGlobalScore() {
+        try { globalScore = JSON.parse(localStorage.getItem('checkers_global_score') || '{"user":0,"ai":0}'); } catch(e){}
+        document.getElementById('global-user-score').innerText = globalScore.user;
+        document.getElementById('global-ai-score').innerText = globalScore.ai;
+    }
+    function saveGlobalScore() {
+        localStorage.setItem('checkers_global_score', JSON.stringify(globalScore));
+        loadGlobalScore();
+    }
+    function resetGlobalScore() {
+         if(confirm("Сбросить общий счёт?")) { globalScore={user:0,ai:0}; saveGlobalScore(); }
+    }
+    function updateChatTitle() { 
+        const p = Object.values(PERSONAS).find(p => p.id === userSettings.personaKey);
+        document.getElementById('chat-title').innerText = `Gemini (${p ? p.name.split('«')[1]?.split('»')[0] || p.name : 'Custom'})`; 
+    }
+</script>
+</body>
+</html>
