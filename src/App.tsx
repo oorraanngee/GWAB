@@ -50,11 +50,11 @@ export default function App() {
           <span>GWAB.exe</span>
           <div className="flex gap-1">
             <button className="win95-btn-small" onClick={toggleTheme} title="Сменить тему">
-              {theme === 'light' ? '🌙' : '☀️'}
+              {theme === 'light' ? '☽' : '☀'}
             </button>
             <button className="win95-btn-small">_</button>
-            <button className="win95-btn-small">□</button>
-            <button className="win95-btn-small">:)</button>
+            <button className="win95-btn-small">(:<</button>
+            <button className="win95-btn-small">>:)</button>
           </div>
         </div>
         
