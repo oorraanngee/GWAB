@@ -47,14 +47,14 @@ export default function App() {
       {/* Main Window */}
       <div className="win95-window mb-8 max-w-5xl mx-auto">
         <div className="win95-titlebar">
-          <span>Bwab.exe</span>
+          <span>GWAB.exe</span>
           <div className="flex gap-1">
             <button className="win95-btn-small" onClick={toggleTheme} title="Сменить тему">
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
             <button className="win95-btn-small">_</button>
             <button className="win95-btn-small">□</button>
-            <button className="win95-btn-small">×</button>
+            <button className="win95-btn-small">:)</button>
           </div>
         </div>
         
