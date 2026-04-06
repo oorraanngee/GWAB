@@ -47,7 +47,7 @@ export default function App() {
       {/* Main Window */}
       <div className="win95-window mb-8 max-w-5xl mx-auto">
         <div className="win95-titlebar">
-          <span>Moe-krutoe-portfolio.exe</span>
+          <span>Bwab.exe</span>
           <div className="flex gap-1">
             <button className="win95-btn-small" onClick={toggleTheme} title="Сменить тему">
               {theme === 'light' ? '🌙' : '☀️'}
@@ -63,7 +63,7 @@ export default function App() {
             <div className="win95-inset p-4 flex-1">
               <h1 className="text-2xl font-bold mb-2">Мои работы:</h1>
               <p className="mb-2">
-                Добро пожаловать в моё портфолио работ!
+                Добро пожаловать на глаб!
               </p>
               <ul className="list-disc list-inside mb-4 ml-2">
                 <li>Вы можете тут: скачать расширение (в формате.zip).</li>
