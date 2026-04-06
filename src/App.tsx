@@ -52,9 +52,9 @@ export default function App() {
             <button className="win95-btn-small" onClick={toggleTheme} title="Сменить тему">
               {theme === 'light' ? '☽' : '☀'}
             </button>
-            <button className="win95-btn-small">_</button>
-            <button className="win95-btn-small">(:<</button>
-            <button className="win95-btn-small">>:)</button>
+            <button className="win95-btn-small">°⌣°</button>
+            <button className="win95-btn-small">(:</button>
+            <button className="win95-btn-small">:)</button>
           </div>
         </div>
         
